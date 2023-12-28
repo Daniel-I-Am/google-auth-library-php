@@ -263,6 +263,46 @@ class GCECredentialsTest extends BaseTest
         $this->assertNull($creds->getLastReceivedToken());
     }
 
+    public function testLastReceivedTokenStoresAccessToken()
+    {
+        $wantedTokens = [
+            'access_token' => '1/abdef1234567890',
+            'expires_in' => '57',
+        ];
+        $jsonTokens = json_encode($wantedTokens);
+        $httpHandler = getHandler([
+            new Response(200, [GCECredentials::FLAVOR_HEADER => 'Google']),
+            new Response(200, [], Utils::streamFor($jsonTokens)),
+        ]);
+        $g = new GCECredentials();
+        $receivedToken = $g->fetchAuthToken($httpHandler);
+        $this->assertEquals(
+            $wantedTokens['access_token'],
+            $receivedToken['access_token']
+        );
+        $this->assertIsArray($g->getLastReceivedToken());
+        $this->assertArrayHasKey('access_token', $g->getLastReceivedToken());
+        $this->assertEquals($wantedTokens['access_token'], $g->getLastReceivedToken()['access_token']);
+    }
+
+    public function testLastReceivedTokenStoresIdToken()
+    {
+        $token = 'e30.e30.c2ln';
+        $httpHandler = getHandler([
+            new Response(200, [GCECredentials::FLAVOR_HEADER => 'Google']),
+            new Response(200, [], Utils::streamFor($token)),
+        ]);
+        $g = new GCECredentials(targetAudience: 'audience');
+        $receivedToken = $g->fetchAuthToken($httpHandler);
+        $this->assertEquals(
+            $token,
+            $receivedToken['id_token']
+        );
+        $this->assertIsArray($g->getLastReceivedToken());
+        $this->assertArrayHasKey('id_token', $g->getLastReceivedToken());
+        $this->assertEquals($token, $g->getLastReceivedToken()['id_token']);
+    }
+
     public function testGetClientName()
     {
         $expected = 'foobar';

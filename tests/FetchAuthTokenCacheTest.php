@@ -105,7 +105,7 @@ class FetchAuthTokenCacheTest extends BaseTest
         $this->assertEquals($idToken, ['id_token' => $token]);
     }
 
-    public function testUpdateMetadataWithCache()
+    public function testUpdateMetadataWithAccessTokenCache()
     {
         $cacheKey = 'myKey';
         $token = '2/abcdef1234567890';
@@ -143,7 +143,7 @@ class FetchAuthTokenCacheTest extends BaseTest
         $this->assertEquals('bar', $headers['foo']);
     }
 
-    public function testUpdateMetadataWithoutCache()
+    public function testUpdateMetadataWithoutAccessTokenCache()
     {
         $cacheKey = 'myKey';
         $token = '2/abcdef1234567890';
@@ -233,6 +233,89 @@ class FetchAuthTokenCacheTest extends BaseTest
         // Ensure token for different URI is NOT cached
         $metadata3 = $cachedFetcher->updateMetadata([], 'http://test-auth-uri-2');
         $this->assertNotEquals($metadata, $metadata3);
+    }
+
+    public function testUpdateMetadataWithIdTokenCache()
+    {
+        $cacheKey = 'myKey';
+        $token = 'e30.e30.c2ln';
+        $cachedValue = ['id_token' => $token];
+        $this->mockCacheItem->isHit()
+            ->shouldBeCalledTimes(1)
+            ->willReturn(true);
+        $this->mockCacheItem->get()
+            ->shouldBeCalledTimes(1)
+            ->willReturn($cachedValue);
+        $this->mockCache->getItem($cacheKey)
+            ->shouldBeCalledTimes(1)
+            ->willReturn($this->mockCacheItem->reveal());
+        $this->mockFetcher->fetchAuthToken()
+            ->shouldNotBeCalled();
+        $this->mockFetcher->getCacheKey()
+            ->shouldBeCalled()
+            ->willReturn($cacheKey);
+        $this->mockFetcher->updateMetadata(Argument::type('array'), null, null)
+            ->shouldBeCalled()
+            ->will(function ($args, $fetcher) {
+                return $args[0];
+            });
+
+        // Run the test.
+        $cachedFetcher = new FetchAuthTokenCache(
+            $this->mockFetcher->reveal(),
+            null,
+            $this->mockCache->reveal()
+        );
+        $headers = $cachedFetcher->updateMetadata(['foo' => 'bar']);
+        $this->assertArrayHasKey('authorization', $headers);
+        $this->assertEquals(["Bearer $token"], $headers['authorization']);
+        $this->assertArrayHasKey('foo', $headers);
+        $this->assertEquals('bar', $headers['foo']);
+    }
+
+    public function testUpdateMetadataWithoutIdTokenCache()
+    {
+        $cacheKey = 'myKey';
+        $token = 'e30.e30.c2ln';
+        $value = ['id_token' => $token];
+        $this->mockCacheItem->isHit()
+            ->shouldBeCalledTimes(1)
+            ->willReturn(false);
+        $this->mockCache->getItem($cacheKey)
+            ->shouldBeCalledTimes(2)
+            ->willReturn($this->mockCacheItem->reveal());
+        $this->mockFetcher->getCacheKey()
+            ->shouldBeCalled()
+            ->willReturn($cacheKey);
+        $this->mockFetcher->getLastReceivedToken()
+            ->shouldBeCalled()
+            ->willReturn($value);
+        $this->mockCacheItem->set($value)
+            ->shouldBeCalledTimes(1)
+            ->willReturn($this->mockCacheItem->reveal());
+        $this->mockCacheItem->expiresAfter(1500)
+            ->shouldBeCalledTimes(1)
+            ->willReturn($this->mockCacheItem->reveal());
+        $this->mockCache->save($this->mockCacheItem)
+            ->shouldBeCalledTimes(1);
+        $this->mockFetcher->updateMetadata(Argument::type('array'), null, null)
+            ->shouldBeCalled()
+            ->will(function ($args, $fetcher) use ($token) {
+                $args[0]['authorization'] = ["Bearer $token"];
+                return $args[0];
+            });
+
+        // Run the test.
+        $cachedFetcher = new FetchAuthTokenCache(
+            $this->mockFetcher->reveal(),
+            null,
+            $this->mockCache->reveal()
+        );
+        $headers = $cachedFetcher->updateMetadata(['foo' => 'bar']);
+        $this->assertArrayHasKey('authorization', $headers);
+        $this->assertEquals(["Bearer $token"], $headers['authorization']);
+        $this->assertArrayHasKey('foo', $headers);
+        $this->assertEquals('bar', $headers['foo']);
     }
 
     public function testUpdateMetadataWithInvalidFetcher()
