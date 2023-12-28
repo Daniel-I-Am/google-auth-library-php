@@ -230,12 +230,16 @@ class FetchAuthTokenCache implements
 
         $cached = $this->fetchAuthTokenFromCache($authUri);
         if ($cached) {
-            // Set the access token in the `Authorization` metadata header so
+            // Set the access token or oidc token in the `Authorization` metadata header so
             // the downstream call to updateMetadata know they don't need to
             // fetch another token.
             if (isset($cached['access_token'])) {
                 $metadata[self::AUTH_METADATA_KEY] = [
                     'Bearer ' . $cached['access_token']
+                ];
+            } elseif (isset($cached['id_token'])) {
+                $metadata[self::AUTH_METADATA_KEY] = [
+                    'Bearer ' . $cached['id_token']
                 ];
             }
         }

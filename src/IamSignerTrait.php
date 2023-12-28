@@ -57,7 +57,7 @@ trait IamSignerTrait
 
         if (is_null($accessToken)) {
             $previousToken = $this->getLastReceivedToken();
-            $accessToken = $previousToken
+            $accessToken = ($previousToken && isset($previousToken['access_token']))
                 ? $previousToken['access_token']
                 : $this->fetchAuthToken($httpHandler)['access_token'];
         }
